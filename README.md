@@ -4,6 +4,12 @@ This is a dependency-free clickable HTML recreation of the RDO inspection app de
 
 Open `index.html` in a browser to try it.
 
+Related guides:
+
+- `GITHUB_PAGES_STEPS.md` - publish the clickable mockup with GitHub Pages.
+- `IT_Setup_Guide.md` - Microsoft / SharePoint setup notes for IT.
+- `APP_STORE_RELEASE_GUIDE.md` - steps to release a production app through the Apple App Store and Google Play.
+
 Implemented flows:
 
 - Property list with all 21 properties and brand metadata.
