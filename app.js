@@ -988,7 +988,7 @@ function renderSection() {
                   <button class="status-button ${item.status === status ? `active ${status}` : ""}" onclick="setStatus('${section.id}', '${item.id}', '${status}')">${statusLabels[status]}</button>
                 `).join("")}
               </div>
-              ${item.status === "see_notes" ? h`
+              ${["no", "see_notes"].includes(item.status) ? h`
                 <div class="question-detail">
                   <div class="field">
                     <label>Notes for this question</label>
