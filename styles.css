@@ -28,6 +28,7 @@ body {
     var(--bg);
   color: var(--ink);
   font-family: Arial, Helvetica, sans-serif;
+  font-size: 14.667px;
 }
 
 button,
@@ -141,7 +142,7 @@ button {
 .screen-header h1,
 .section-heading h2 {
   margin: 0 0 6px;
-  font-size: clamp(24px, 4vw, 36px);
+  font-size: clamp(22.667px, 4vw, 34.667px);
   letter-spacing: 0;
 }
 
@@ -275,7 +276,7 @@ button {
 .metric strong {
   display: block;
   margin-top: 8px;
-  font-size: 28px;
+  font-size: 26.667px;
 }
 
 .field {
@@ -285,7 +286,7 @@ button {
 
 .field label {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 11.667px;
   font-weight: 700;
 }
 
@@ -423,7 +424,7 @@ button {
   border-radius: 8px;
   background: #fff;
   color: var(--ink);
-  font-size: 13px;
+  font-size: 11.667px;
 }
 
 .check-row input {
@@ -467,7 +468,7 @@ button {
   flex-wrap: wrap;
   margin-top: 4px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 11.667px;
 }
 
 .chip {
@@ -479,7 +480,7 @@ button {
   border-radius: 999px;
   background: #edf1ed;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 10.667px;
   font-weight: 700;
 }
 
@@ -648,7 +649,7 @@ button {
   padding: 8px;
   overflow: hidden;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 10.667px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -676,7 +677,7 @@ td {
 
 th {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 10.667px;
   text-transform: uppercase;
 }
 
@@ -844,7 +845,7 @@ td textarea {
   .mobile-tabs .nav-left {
     flex-direction: column;
     gap: 3px;
-    font-size: 11px;
+    font-size: 9.667px;
   }
 
   .top-actions .btn.ghost {
