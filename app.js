@@ -889,8 +889,8 @@ function screen(title, subtitle, body, footer = "") {
   `;
 }
 
-function renderProperties() {
-  const filtered = properties.filter((property) => {
+function filteredProperties() {
+  return properties.filter((property) => {
     const q = state.query.toLowerCase();
     return [property.propertyCode, property.innCode, property.propertyName, property.brand].join(" ").toLowerCase().includes(q);
   }).sort((a, b) => {
@@ -898,7 +898,32 @@ function renderProperties() {
     if (brand !== 0) return brand;
     return a.propertyName.localeCompare(b.propertyName);
   });
+}
 
+function propertyRows() {
+  const filtered = filteredProperties();
+  return filtered.length ? filtered.map((property) => h`
+    <button class="property-row ${property.propertyCode === state.property.propertyCode ? "active" : ""}" onclick="selectProperty('${property.propertyCode}')">
+      <span>
+        <strong>${escapeHtml(property.innCode)} - ${escapeHtml(property.propertyName)}</strong>
+        <span class="property-meta">
+          <span class="chip ${brandClass(property.brand)}">${escapeHtml(property.brand)}</span>
+          <span>Property ${escapeHtml(property.propertyCode)}</span>
+          <span>${escapeHtml(property.legalEntity)}</span>
+        </span>
+      </span>
+      <span class="icon">></span>
+    </button>
+  `).join("") : `<p class="muted">No properties match that search.</p>`;
+}
+
+function updatePropertySearch(value) {
+  state.query = value;
+  const list = document.getElementById("propertyList");
+  if (list) list.innerHTML = propertyRows();
+}
+
+function renderProperties() {
   return screen(
     "Property List",
     "Search by inn code, property name, brand, or property code. Recent and active properties stay one tap away.",
@@ -906,24 +931,12 @@ function renderProperties() {
       <div class="toolbar">
         <div class="field" style="flex:1; min-width:240px">
           <label for="propertySearch">Search properties</label>
-          <input id="propertySearch" class="input" value="${escapeHtml(state.query)}" oninput="state.query=this.value; render()" placeholder="Try BOIHW, Hilton, or Waco" />
+          <input id="propertySearch" class="input" value="${escapeHtml(state.query)}" oninput="updatePropertySearch(this.value)" placeholder="Try BOIHW, Hilton, or Waco" />
         </div>
         <div class="chip green">${properties.length} properties</div>
       </div>
-      <div class="property-list">
-        ${filtered.map((property) => h`
-          <button class="property-row ${property.propertyCode === state.property.propertyCode ? "active" : ""}" onclick="selectProperty('${property.propertyCode}')">
-            <span>
-              <strong>${escapeHtml(property.innCode)} - ${escapeHtml(property.propertyName)}</strong>
-              <span class="property-meta">
-                <span class="chip ${brandClass(property.brand)}">${escapeHtml(property.brand)}</span>
-                <span>Property ${escapeHtml(property.propertyCode)}</span>
-                <span>${escapeHtml(property.legalEntity)}</span>
-              </span>
-            </span>
-            <span class="icon">></span>
-          </button>
-        `).join("")}
+      <div id="propertyList" class="property-list">
+        ${propertyRows()}
       </div>
     `
   );
