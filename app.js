@@ -490,17 +490,6 @@ function updateItemNotes(sectionId, itemId, value) {
   item.notes = value;
 }
 
-function addPhoto(sectionId) {
-  const section = state.sections.find((entry) => entry.id === sectionId);
-  const stamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  section.photos.push({
-    id: `photo-${Date.now()}`,
-    caption: `${state.property.innCode} ${section.name}`,
-    stamp
-  });
-  render();
-}
-
 function addItemPhoto(input, sectionId, itemId) {
   const file = input.files && input.files[0];
   if (!file) return;
@@ -513,6 +502,25 @@ function addItemPhoto(input, sectionId, itemId) {
       id: `photo-${Date.now()}`,
       name: file.name,
       src: reader.result,
+      stamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    });
+    render();
+  };
+  reader.readAsDataURL(file);
+}
+
+function addSectionPhoto(input, sectionId) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const section = state.sections.find((entry) => entry.id === sectionId);
+    section.photos.push({
+      id: `photo-${Date.now()}`,
+      name: file.name,
+      src: reader.result,
+      caption: `${state.property.innCode} ${section.name}`,
       stamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     });
     render();
@@ -753,11 +761,17 @@ function renderSection() {
         <div class="card">
           <div class="toolbar">
             <strong>Photos</strong>
-            <button class="btn" onclick="addPhoto('${section.id}')">Add photo</button>
+            <label class="btn">
+              Add photo
+              <input class="file-input" type="file" accept="image/*" capture="environment" onchange="addSectionPhoto(this, '${section.id}')" />
+            </label>
           </div>
           <div class="photo-grid">
             ${section.photos.length ? section.photos.map((photo) => h`
-              <div class="photo-tile"><strong>${escapeHtml(photo.caption)}</strong><span>${escapeHtml(photo.stamp)}</span></div>
+              <div class="photo-preview">
+                <img src="${photo.src}" alt="${escapeHtml(photo.name || photo.caption)}" />
+                <span>${escapeHtml(photo.name || photo.caption)} - ${escapeHtml(photo.stamp)}</span>
+              </div>
             `).join("") : `<p class="muted">No photos attached to this section yet.</p>`}
           </div>
         </div>
