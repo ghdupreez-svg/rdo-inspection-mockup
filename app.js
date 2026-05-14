@@ -31,20 +31,48 @@ const defaultProperties = [
 
 let properties = loadProperties();
 
+function readStorage(key, fallback = null) {
+  try {
+    return localStorage.getItem(key) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeStorage(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // The mockup still works if browser privacy settings block localStorage.
+  }
+}
+
+function removeStorage(key) {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // Ignore blocked storage in local file/privacy contexts.
+  }
+}
+
 function loadProperties() {
   try {
-    const saved = JSON.parse(localStorage.getItem("rdoProperties") || "null");
+    const saved = JSON.parse(readStorage("rdoProperties", "null"));
     if (Array.isArray(saved) && saved.length) {
       return saved.map((property) => ({ siteUrl: "", ...property }));
     }
   } catch {
-    localStorage.removeItem("rdoProperties");
+    removeStorage("rdoProperties");
   }
   return defaultProperties;
 }
 
 function saveProperties() {
-  localStorage.setItem("rdoProperties", JSON.stringify(properties));
+  writeStorage("rdoProperties", JSON.stringify(properties));
+}
+
+function initialProperty() {
+  return properties.find((property) => property && property.innCode === "BOIHW") || properties[0] || defaultProperties[0];
 }
 
 const sections = [
@@ -186,6 +214,57 @@ const sections = [
   photos: []
 }));
 
+function cloneSections(source = sections) {
+  return JSON.parse(JSON.stringify(source));
+}
+
+function normalizeTemplateSection(section, sectionIndex) {
+  const name = String(section.name || `Section ${sectionIndex + 1}`).trim() || `Section ${sectionIndex + 1}`;
+  const baseId = slugify(name) || `section-${sectionIndex + 1}`;
+  const items = Array.isArray(section.items) ? section.items : [];
+  return {
+    id: section.id || baseId,
+    name,
+    prompt: section.prompt || "",
+    items: items.map((item, itemIndex) => {
+      const text = typeof item === "string" ? item : item.text;
+      return {
+        id: item.id || `${baseId}-${itemIndex + 1}`,
+        text: String(text || `Question ${itemIndex + 1}`).trim(),
+        status: item.status || "",
+        notes: item.notes || "",
+        photos: Array.isArray(item.photos) ? item.photos : []
+      };
+    }).filter((item) => item.text),
+    notes: section.notes || "",
+    photos: Array.isArray(section.photos) ? section.photos : []
+  };
+}
+
+function loadReportTemplate() {
+  try {
+    const saved = JSON.parse(readStorage("rdoReportTemplate", "null"));
+    if (Array.isArray(saved) && saved.length) {
+      const normalized = saved.map(normalizeTemplateSection).filter((section) => section.items.length);
+      if (normalized.length) return normalized;
+    }
+  } catch {
+    removeStorage("rdoReportTemplate");
+  }
+  return cloneSections();
+}
+
+function saveReportTemplate() {
+  writeStorage("rdoReportTemplate", JSON.stringify(state.sections));
+}
+
+function slugify(value) {
+  return String(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
 const statusLabels = {
   yes: "Yes",
   no: "No",
@@ -199,17 +278,16 @@ const nav = [
   ["action", "Actions", "A"],
   ["signatures", "Sign", "S"],
   ["review", "Review", "V"],
-  ["users", "Users", "U"],
-  ["microsoft", "Microsoft", "M"],
   ["settings", "Settings", "G"]
 ];
 
 const state = {
   screen: "properties",
-  property: properties[2],
+  property: initialProperty(),
   sectionId: sections[0].id,
+  settingsTab: "properties",
   query: "",
-  sections: JSON.parse(JSON.stringify(sections)),
+  sections: loadReportTemplate(),
   actionPlan: [],
   signatures: {
     managerName: "",
@@ -245,7 +323,7 @@ const state = {
   userAdmin: {
     unlocked: false,
     passwordInput: "",
-    adminEmail: localStorage.getItem("rdoAdminEmail") || "gerhard@company.com"
+    adminEmail: readStorage("rdoAdminEmail", "gerhard@company.com")
   },
   newUser: {
     email: "",
@@ -259,21 +337,28 @@ const state = {
       viewSettings: false
     }
   },
+  newSectionName: "",
+  newQuestion: {
+    sectionId: "",
+    text: ""
+  },
+  templateImportText: "",
+  templateImportMessage: "",
   submitted: false
 };
 
 function loadUsers() {
   try {
-    const saved = JSON.parse(localStorage.getItem("rdoUsers") || "null");
+    const saved = JSON.parse(readStorage("rdoUsers", "null"));
     if (Array.isArray(saved)) return saved;
   } catch {
-    localStorage.removeItem("rdoUsers");
+    removeStorage("rdoUsers");
   }
   return [];
 }
 
 function saveUsers() {
-  localStorage.setItem("rdoUsers", JSON.stringify(state.users));
+  writeStorage("rdoUsers", JSON.stringify(state.users));
 }
 
 const app = document.getElementById("app");
@@ -398,7 +483,7 @@ function unlockUserAdmin() {
 
 function updateAdminEmail(value) {
   state.userAdmin.adminEmail = value.trim();
-  localStorage.setItem("rdoAdminEmail", state.userAdmin.adminEmail);
+  writeStorage("rdoAdminEmail", state.userAdmin.adminEmail);
 }
 
 function updateNewUser(key, value) {
@@ -455,6 +540,181 @@ function updateAllowedUserPermission(id, key, value) {
   if (!user) return;
   user.permissions[key] = value;
   saveUsers();
+}
+
+function setSettingsTab(tab) {
+  state.settingsTab = tab;
+  render();
+}
+
+function touchReportTemplate() {
+  if (!state.sections.some((section) => section.id === state.sectionId)) {
+    state.sectionId = state.sections[0]?.id || "";
+  }
+  saveReportTemplate();
+}
+
+function updateReportSection(sectionId, key, value) {
+  const section = state.sections.find((entry) => entry.id === sectionId);
+  if (!section) return;
+  section[key] = value;
+  touchReportTemplate();
+}
+
+function addReportSection() {
+  const name = state.newSectionName.trim();
+  if (!name) return;
+  const idBase = slugify(name) || `section-${Date.now()}`;
+  const id = state.sections.some((section) => section.id === idBase) ? `${idBase}-${Date.now()}` : idBase;
+  state.sections.push({
+    id,
+    name,
+    prompt: "",
+    items: [],
+    notes: "",
+    photos: []
+  });
+  state.newSectionName = "";
+  state.sectionId = id;
+  touchReportTemplate();
+  render();
+}
+
+function removeReportSection(sectionId) {
+  if (state.sections.length <= 1) return;
+  state.sections = state.sections.filter((section) => section.id !== sectionId);
+  state.actionPlan = state.actionPlan.filter((row) => state.sections.some((section) => section.name === row.discipline));
+  touchReportTemplate();
+  render();
+}
+
+function updateReportQuestion(sectionId, itemId, value) {
+  const section = state.sections.find((entry) => entry.id === sectionId);
+  const item = section?.items.find((entry) => entry.id === itemId);
+  if (!item) return;
+  item.text = value;
+  const action = state.actionPlan.find((row) => row.sourceItemId === itemId);
+  if (action) action.actionStep = value;
+  touchReportTemplate();
+}
+
+function addReportQuestion(sectionId) {
+  const text = state.newQuestion.text.trim();
+  if (!text) return;
+  const section = state.sections.find((entry) => entry.id === sectionId);
+  if (!section) return;
+  const id = `${section.id}-${Date.now()}`;
+  section.items.push({ id, text, status: "", notes: "", photos: [] });
+  state.newQuestion = { sectionId: "", text: "" };
+  touchReportTemplate();
+  render();
+}
+
+function removeReportQuestion(sectionId, itemId) {
+  const section = state.sections.find((entry) => entry.id === sectionId);
+  if (!section || section.items.length <= 1) return;
+  section.items = section.items.filter((item) => item.id !== itemId);
+  state.actionPlan = state.actionPlan.filter((row) => row.sourceItemId !== itemId);
+  touchReportTemplate();
+  render();
+}
+
+function resetReportTemplate() {
+  state.sections = cloneSections();
+  state.sectionId = state.sections[0].id;
+  state.actionPlan = [];
+  state.templateImportText = "";
+  state.templateImportMessage = "Restored the original RDO trip report template.";
+  saveReportTemplate();
+  render();
+}
+
+function parseDelimitedLine(line, delimiter) {
+  const cells = [];
+  let cell = "";
+  let quoted = false;
+
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    const next = line[i + 1];
+    if (char === '"' && quoted && next === '"') {
+      cell += '"';
+      i += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === delimiter && !quoted) {
+      cells.push(cell.trim());
+      cell = "";
+    } else {
+      cell += char;
+    }
+  }
+
+  cells.push(cell.trim());
+  return cells;
+}
+
+function buildSectionsFromRows(text) {
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (!lines.length) return [];
+
+  const delimiter = lines.some((line) => line.includes("\t")) ? "\t" : ",";
+  const rows = lines.map((line) => parseDelimitedLine(line, delimiter));
+  const first = rows[0].map((cell) => cell.toLowerCase());
+  const hasHeader = first.some((cell) => ["section", "header", "question", "item", "prompt"].includes(cell));
+  const sectionHeaderIndex = Math.max(first.indexOf("section"), first.indexOf("header"));
+  const questionHeaderIndex = Math.max(first.indexOf("question"), first.indexOf("item"));
+  const sectionIndex = hasHeader && sectionHeaderIndex >= 0 ? sectionHeaderIndex : 0;
+  const questionIndex = hasHeader && questionHeaderIndex >= 0 ? questionHeaderIndex : 1;
+  const promptIndex = hasHeader ? first.indexOf("prompt") : 2;
+  const dataRows = hasHeader ? rows.slice(1) : rows;
+  const grouped = new Map();
+
+  dataRows.forEach((row) => {
+    const sectionName = row[sectionIndex] || "Imported Section";
+    const question = row[questionIndex] || "";
+    const prompt = promptIndex >= 0 ? row[promptIndex] || "" : "";
+    if (!question.trim()) return;
+    if (!grouped.has(sectionName)) {
+      grouped.set(sectionName, { name: sectionName, prompt, items: [] });
+    }
+    const section = grouped.get(sectionName);
+    if (prompt && !section.prompt) section.prompt = prompt;
+    section.items.push(question);
+  });
+
+  return [...grouped.values()].map(normalizeTemplateSection).filter((section) => section.items.length);
+}
+
+function importReportTemplateText(text = state.templateImportText) {
+  const imported = buildSectionsFromRows(text);
+  if (!imported.length) {
+    state.templateImportMessage = "No report sections were found. Use columns like Section, Question, Prompt.";
+    render();
+    return;
+  }
+  state.sections = imported;
+  state.sectionId = state.sections[0].id;
+  state.actionPlan = [];
+  state.templateImportMessage = `Loaded ${state.sections.length} sections and ${state.sections.reduce((sum, section) => sum + section.items.length, 0)} questions.`;
+  saveReportTemplate();
+  render();
+}
+
+function importReportTemplateFile(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  if (/\.xlsx?$/i.test(file.name)) {
+    state.templateImportMessage = "For this browser mockup, save the Excel sheet as CSV or copy/paste its rows from Excel. Production can read native .xlsx files.";
+    render();
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    state.templateImportText = String(reader.result || "");
+    importReportTemplateText(state.templateImportText);
+  };
+  reader.readAsText(file);
 }
 
 function setStatus(sectionId, itemId, status) {
@@ -648,7 +908,7 @@ function renderProperties() {
           <label for="propertySearch">Search properties</label>
           <input id="propertySearch" class="input" value="${escapeHtml(state.query)}" oninput="state.query=this.value; render()" placeholder="Try BOIHW, Hilton, or Waco" />
         </div>
-        <div class="chip green">21 properties</div>
+        <div class="chip green">${properties.length} properties</div>
       </div>
       <div class="property-list">
         ${filtered.map((property) => h`
@@ -704,7 +964,11 @@ function renderHome() {
 }
 
 function renderSection() {
-  const section = state.sections.find((entry) => entry.id === state.sectionId);
+  let section = state.sections.find((entry) => entry.id === state.sectionId);
+  if (!section) {
+    section = state.sections[0];
+    state.sectionId = section.id;
+  }
   const idx = state.sections.findIndex((entry) => entry.id === section.id);
   const p = sectionProgress(section);
   const systemLabel = state.property.brand === "Hyatt" ? "Bob" : "Innspector App";
@@ -960,6 +1224,37 @@ function renderReview() {
 }
 
 function renderSettings() {
+  const tabs = [
+    ["properties", "Properties"],
+    ["microsoft", "Microsoft"],
+    ["users", "Users"],
+    ["template", "Report Template"]
+  ];
+  const bodies = {
+    properties: renderPropertiesSettings,
+    microsoft: renderMicrosoftSettings,
+    users: renderUsersSettings,
+    template: renderReportTemplateSettings
+  };
+
+  return screen(
+    "Settings",
+    "Manage properties, Microsoft setup, user access, and the report template from one admin area.",
+    h`
+      <div class="settings-tabs">
+        ${tabs.map(([id, label]) => h`
+          <button class="tab-button ${state.settingsTab === id ? "active" : ""}" onclick="setSettingsTab('${id}')">${label}</button>
+        `).join("")}
+      </div>
+      <div class="settings-panel">
+        ${(bodies[state.settingsTab] || bodies.properties)()}
+      </div>
+    `,
+    h`<button class="btn primary" onclick="go('home')">Done</button>`
+  );
+}
+
+function renderPropertiesSettings() {
   const defaultBrands = ["Hilton", "Marriott", "Hyatt", "Extended Stay America"];
   const sortedProperties = [...properties].sort((a, b) => {
     const brand = a.brand.localeCompare(b.brand);
@@ -967,10 +1262,7 @@ function renderSettings() {
     return a.propertyName.localeCompare(b.propertyName);
   });
 
-  return screen(
-    "Settings",
-    "Configure the per-property SharePoint topology and offline behavior for the mockup.",
-    h`
+  return h`
       <div class="grid two">
         <div class="field">
           <label>Document library</label>
@@ -1077,9 +1369,7 @@ function renderSettings() {
         <div class="metric"><span class="muted">Photo quality</span><strong>High</strong><span>3000 px / 85%</span></div>
         <div class="metric"><span class="muted">Account</span><strong>SSO</strong><span>Microsoft 365 placeholder</span></div>
       </div>
-    `,
-    h`<button class="btn primary" onclick="go('home')">Done</button>`
-  );
+    `;
 }
 
 function permissionCheckbox(label, checked, handler) {
@@ -1088,6 +1378,242 @@ function permissionCheckbox(label, checked, handler) {
       <input type="checkbox" ${checked ? "checked" : ""} onchange="${handler}" />
       <span>${label}</span>
     </label>
+  `;
+}
+
+function renderUsersSettings() {
+  if (!state.userAdmin.unlocked) {
+    return h`
+      <div class="grid two">
+        <div class="card">
+          <strong>Admin</strong>
+          <p class="muted">This public mockup uses demo password demo-admin. Production should use Microsoft Entra ID groups or app roles.</p>
+          <div class="field" style="margin-top:12px">
+            <label>Admin email</label>
+            <input class="input" value="${escapeHtml(state.userAdmin.adminEmail)}" oninput="updateAdminEmail(this.value)" placeholder="your.work.email@company.com" />
+          </div>
+          <div class="field" style="margin-top:12px">
+            <label>Admin password</label>
+            <input class="input" type="password" value="${escapeHtml(state.userAdmin.passwordInput)}" oninput="state.userAdmin.passwordInput=this.value" onkeydown="if(event.key==='Enter') unlockUserAdmin()" />
+          </div>
+          <button class="btn primary" style="margin-top:12px" onclick="unlockUserAdmin()">Unlock users</button>
+        </div>
+        <div class="card">
+          <strong>Access model</strong>
+          <p class="muted">Allowed users are saved in this browser for prototype testing. The real mobile app would check the signed-in Microsoft 365 work email against an approved user list or Entra security group.</p>
+        </div>
+      </div>
+    `;
+  }
+
+  return h`
+    <div class="card">
+      <div class="toolbar">
+        <div>
+          <strong>Admin</strong>
+          <div class="muted">${escapeHtml(state.userAdmin.adminEmail)}</div>
+        </div>
+        <button class="btn ghost" onclick="state.userAdmin.unlocked=false; render()">Lock</button>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <strong>Add allowed user</strong>
+      <div class="grid three" style="margin-top:12px">
+        <div class="field">
+          <label>Work email</label>
+          <input class="input" type="email" value="${escapeHtml(state.newUser.email)}" oninput="updateNewUser('email', this.value)" placeholder="name@company.com" />
+        </div>
+        <div class="field">
+          <label>Name</label>
+          <input class="input" value="${escapeHtml(state.newUser.name)}" oninput="updateNewUser('name', this.value)" />
+        </div>
+        <div class="field">
+          <label>Role</label>
+          <input class="input" value="${escapeHtml(state.newUser.role)}" oninput="updateNewUser('role', this.value)" placeholder="RDO" />
+        </div>
+      </div>
+      <div class="permission-grid" style="margin-top:12px">
+        ${permissionCheckbox("Complete inspections", state.newUser.permissions.inspect, "updateNewUserPermission('inspect', this.checked)")}
+        ${permissionCheckbox("Submit packages", state.newUser.permissions.submit, "updateNewUserPermission('submit', this.checked)")}
+        ${permissionCheckbox("Manage properties", state.newUser.permissions.manageProperties, "updateNewUserPermission('manageProperties', this.checked)")}
+        ${permissionCheckbox("Manage users", state.newUser.permissions.manageUsers, "updateNewUserPermission('manageUsers', this.checked)")}
+        ${permissionCheckbox("View settings", state.newUser.permissions.viewSettings, "updateNewUserPermission('viewSettings', this.checked)")}
+      </div>
+      <div class="toolbar" style="margin:14px 0 0">
+        <span class="muted">Work email is required and must be unique.</span>
+        <button class="btn primary" onclick="addAllowedUser()">Add user</button>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <div class="toolbar">
+        <strong>Allowed users</strong>
+        <span class="chip green">${state.users.length} users</span>
+      </div>
+      <div class="user-list">
+        ${state.users.length ? state.users.map((user) => h`
+          <div class="user-row">
+            <div class="user-edit-grid">
+              <div class="field">
+                <label>Work email</label>
+                <input class="input" type="email" value="${escapeHtml(user.email)}" oninput="updateAllowedUser('${user.id}', 'email', this.value)" />
+              </div>
+              <div class="field">
+                <label>Name</label>
+                <input class="input" value="${escapeHtml(user.name)}" oninput="updateAllowedUser('${user.id}', 'name', this.value)" />
+              </div>
+              <div class="field">
+                <label>Role</label>
+                <input class="input" value="${escapeHtml(user.role)}" oninput="updateAllowedUser('${user.id}', 'role', this.value)" />
+              </div>
+            </div>
+            <div class="permission-grid">
+              ${permissionCheckbox("Inspect", user.permissions.inspect, `updateAllowedUserPermission('${user.id}', 'inspect', this.checked)`)}
+              ${permissionCheckbox("Submit", user.permissions.submit, `updateAllowedUserPermission('${user.id}', 'submit', this.checked)`)}
+              ${permissionCheckbox("Properties", user.permissions.manageProperties, `updateAllowedUserPermission('${user.id}', 'manageProperties', this.checked)`)}
+              ${permissionCheckbox("Users", user.permissions.manageUsers, `updateAllowedUserPermission('${user.id}', 'manageUsers', this.checked)`)}
+              ${permissionCheckbox("Settings", user.permissions.viewSettings, `updateAllowedUserPermission('${user.id}', 'viewSettings', this.checked)`)}
+            </div>
+            <button class="btn danger" onclick="removeAllowedUser('${user.id}')">Remove access</button>
+          </div>
+        `).join("") : `<p class="muted">No allowed users have been added yet.</p>`}
+      </div>
+    </div>
+  `;
+}
+
+function renderMicrosoftSettings() {
+  return h`
+    <div class="grid two">
+      <div class="field">
+        <label>Microsoft tenant name</label>
+        <input class="input" value="${escapeHtml(state.settings.tenant)}" placeholder="company" oninput="state.settings.tenant=this.value" />
+      </div>
+      <div class="field">
+        <label>Microsoft tenant ID</label>
+        <input class="input" value="${escapeHtml(state.settings.tenantId)}" placeholder="00000000-0000-0000-0000-000000000000" oninput="state.settings.tenantId=this.value" />
+      </div>
+      <div class="field">
+        <label>Entra app client ID</label>
+        <input class="input" value="${escapeHtml(state.settings.clientId)}" placeholder="Application (client) ID" oninput="state.settings.clientId=this.value" />
+      </div>
+      <div class="field">
+        <label>Mobile redirect URI</label>
+        <input class="input" value="${escapeHtml(state.settings.redirectUri)}" oninput="state.settings.redirectUri=this.value" />
+      </div>
+      <div class="field">
+        <label>iOS bundle ID</label>
+        <input class="input" value="${escapeHtml(state.settings.iosBundleId)}" oninput="state.settings.iosBundleId=this.value" />
+      </div>
+      <div class="field">
+        <label>Android package name</label>
+        <input class="input" value="${escapeHtml(state.settings.androidPackageName)}" oninput="state.settings.androidPackageName=this.value" />
+      </div>
+      <div class="field">
+        <label>Graph permission model</label>
+        <select class="select" onchange="state.settings.graphPermissionModel=this.value">
+          <option ${state.settings.graphPermissionModel === "Sites.Selected" ? "selected" : ""}>Sites.Selected</option>
+          <option ${state.settings.graphPermissionModel === "Sites.ReadWrite.All" ? "selected" : ""}>Sites.ReadWrite.All</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Graph scopes</label>
+        <input class="input" value="${escapeHtml(state.settings.graphScopes)}" oninput="state.settings.graphScopes=this.value" />
+      </div>
+      <div class="field">
+        <label>Admin group</label>
+        <input class="input" value="${escapeHtml(state.settings.adminGroup)}" oninput="state.settings.adminGroup=this.value" />
+      </div>
+      <div class="field">
+        <label>User group</label>
+        <input class="input" value="${escapeHtml(state.settings.userGroup)}" oninput="state.settings.userGroup=this.value" />
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <strong>Production note</strong>
+      <p class="muted">These values should come from IT after they create the Microsoft Entra app registration and SharePoint permissions. The mockup stores them only in browser memory.</p>
+    </div>
+  `;
+}
+
+function renderReportTemplateSettings() {
+  return h`
+    <div class="card">
+      <div class="toolbar">
+        <div>
+          <strong>Report sections and questions</strong>
+          <div class="muted">Customize the trip report template for this company or import rows from Excel saved as CSV.</div>
+        </div>
+        <span class="chip green">${state.sections.length} sections</span>
+      </div>
+      <div class="grid two" style="margin-top:12px">
+        <div class="field">
+          <label>New section header</label>
+          <input class="input" value="${escapeHtml(state.newSectionName)}" oninput="state.newSectionName=this.value" placeholder="Revenue Management" />
+        </div>
+        <div class="field template-action-field">
+          <label>&nbsp;</label>
+          <button class="btn primary" onclick="addReportSection()">Add section</button>
+        </div>
+      </div>
+    </div>
+    <div class="template-list">
+      ${state.sections.map((section, index) => h`
+        <div class="template-section">
+          <div class="template-section-head">
+            <div class="field">
+              <label>Section ${index + 1} header</label>
+              <input class="input" value="${escapeHtml(section.name)}" oninput="updateReportSection('${section.id}', 'name', this.value)" />
+            </div>
+            <button class="btn danger" onclick="removeReportSection('${section.id}')" ${state.sections.length <= 1 ? "disabled" : ""}>Remove section</button>
+          </div>
+          <div class="field" style="margin-top:10px">
+            <label>Optional prompt</label>
+            <input class="input" value="${escapeHtml(section.prompt || "")}" oninput="updateReportSection('${section.id}', 'prompt', this.value)" placeholder="Would you be comfortable walking a guest through this space?" />
+          </div>
+          <div class="question-admin-list">
+            ${section.items.map((item, itemIndex) => h`
+              <div class="question-admin-row">
+                <div class="field">
+                  <label>Question ${itemIndex + 1}</label>
+                  <input class="input" value="${escapeHtml(item.text)}" oninput="updateReportQuestion('${section.id}', '${item.id}', this.value)" />
+                </div>
+                <button class="btn danger" onclick="removeReportQuestion('${section.id}', '${item.id}')" ${section.items.length <= 1 ? "disabled" : ""}>Remove</button>
+              </div>
+            `).join("")}
+          </div>
+          <div class="question-admin-row add-row">
+            <div class="field">
+              <label>Add question</label>
+              <input class="input" value="${state.newQuestion.sectionId === section.id ? escapeHtml(state.newQuestion.text) : ""}" oninput="state.newQuestion={sectionId:'${section.id}', text:this.value}" placeholder="Question text" />
+            </div>
+            <button class="btn primary" onclick="addReportQuestion('${section.id}')">Add question</button>
+          </div>
+        </div>
+      `).join("")}
+    </div>
+    <div class="card" style="margin-top:16px">
+      <div class="toolbar">
+        <div>
+          <strong>Import template</strong>
+          <div class="muted">Use columns named Section, Question, and optional Prompt. You can paste rows copied from Excel or upload a CSV/TSV file.</div>
+        </div>
+        <label class="btn ghost">
+          Upload CSV
+          <input class="file-input" type="file" accept=".csv,.tsv,.txt,.xlsx,.xls" onchange="importReportTemplateFile(this)" />
+        </label>
+      </div>
+      <div class="field" style="margin-top:12px">
+        <label>Paste Excel/CSV rows</label>
+        <textarea class="textarea" oninput="state.templateImportText=this.value" placeholder="Section,Question,Prompt&#10;Sales,Confirm daily collaboration on business activity,">${escapeHtml(state.templateImportText)}</textarea>
+      </div>
+      <div class="toolbar" style="margin-top:12px">
+        <span class="muted">${escapeHtml(state.templateImportMessage || "Native .xlsx parsing is a production feature; this mockup reads CSV/TSV or pasted Excel rows.")}</span>
+        <div class="toolbar small">
+          <button class="btn ghost" onclick="resetReportTemplate()">Restore RDO template</button>
+          <button class="btn primary" onclick="importReportTemplateText()">Load template</button>
+        </div>
+      </div>
+    </div>
   `;
 }
 

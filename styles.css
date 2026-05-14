@@ -317,6 +317,74 @@ button {
   gap: 10px;
 }
 
+.settings-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tab-button {
+  min-height: 40px;
+  padding: 9px 13px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.tab-button:hover,
+.tab-button.active {
+  background: var(--green-2);
+  color: #113d2e;
+}
+
+.settings-panel {
+  min-width: 0;
+}
+
+.template-list,
+.question-admin-list {
+  display: grid;
+  gap: 10px;
+}
+
+.template-list {
+  margin-top: 16px;
+}
+
+.template-section {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.template-section-head,
+.question-admin-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.question-admin-list {
+  margin-top: 12px;
+}
+
+.question-admin-row.add-row {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.template-action-field {
+  align-content: end;
+}
+
 .user-list {
   display: grid;
   gap: 12px;
@@ -795,6 +863,8 @@ td textarea {
   .question-detail,
   .property-admin-row,
   .property-edit-grid,
+  .template-section-head,
+  .question-admin-row,
   .user-row,
   .user-edit-grid,
   .permission-grid {
