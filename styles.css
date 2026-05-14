@@ -386,6 +386,26 @@ button {
   align-content: end;
 }
 
+.auto-fill-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.auto-fill-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.35fr) minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.auto-fill-row span {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
 .user-list {
   display: grid;
   gap: 12px;
@@ -866,6 +886,7 @@ td textarea {
   .property-edit-grid,
   .template-section-head,
   .question-admin-row,
+  .auto-fill-row,
   .user-row,
   .user-edit-grid,
   .permission-grid {

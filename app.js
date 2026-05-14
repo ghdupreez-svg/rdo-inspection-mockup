@@ -310,6 +310,14 @@ const state = {
     folderTemplate: "RDO Property Visits/{date}",
     library: "Documents"
   },
+  microsoftAccount: {
+    connected: false,
+    displayName: "",
+    email: "",
+    tenantId: "",
+    detectedGroups: [],
+    lastSync: ""
+  },
   newProperty: {
     propertyCode: "",
     innCode: "",
@@ -484,6 +492,25 @@ function unlockUserAdmin() {
 function updateAdminEmail(value) {
   state.userAdmin.adminEmail = value.trim();
   writeStorage("rdoAdminEmail", state.userAdmin.adminEmail);
+}
+
+function syncMicrosoftAccount() {
+  const tenantId = state.settings.tenantId || "00000000-0000-0000-0000-000000000000";
+  state.microsoftAccount = {
+    connected: true,
+    displayName: state.signatures.rdoName || "Signed-in RDO",
+    email: state.userAdmin.adminEmail || "rdo@company.com",
+    tenantId,
+    detectedGroups: [state.settings.userGroup, state.settings.adminGroup].filter(Boolean),
+    lastSync: new Date().toLocaleString([], {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    })
+  };
+  if (!state.settings.tenantId) state.settings.tenantId = tenantId;
+  render();
 }
 
 function updateNewUser(key, value) {
@@ -1496,7 +1523,35 @@ function renderUsersSettings() {
 
 function renderMicrosoftSettings() {
   return h`
-    <div class="grid two">
+    <div class="card">
+      <div class="toolbar">
+        <div>
+          <strong>Connected Microsoft account</strong>
+          <div class="muted">In production, these values are refreshed from Microsoft sign-in and Graph instead of being typed by the user.</div>
+        </div>
+        <button class="btn primary" onclick="syncMicrosoftAccount()">${state.microsoftAccount.connected ? "Refresh sign-in data" : "Simulate Microsoft sign-in"}</button>
+      </div>
+      <div class="grid three" style="margin-top:12px">
+        <div class="metric"><span class="muted">User</span><strong>${escapeHtml(state.microsoftAccount.displayName || "Not signed in")}</strong><span>${escapeHtml(state.microsoftAccount.email || "Waiting for Microsoft login")}</span></div>
+        <div class="metric"><span class="muted">Tenant</span><strong>${escapeHtml(state.microsoftAccount.tenantId || state.settings.tenantId || "Not detected")}</strong><span>From MSAL account claims</span></div>
+        <div class="metric"><span class="muted">Last sync</span><strong>${escapeHtml(state.microsoftAccount.lastSync || "Never")}</strong><span>${state.microsoftAccount.connected ? "Graph profile loaded" : "Mock sign-in pending"}</span></div>
+      </div>
+      <div class="auto-fill-grid" style="margin-top:12px">
+        <div class="auto-fill-row">
+          <strong>Auto-filled after sign-in</strong>
+          <span>Display name, work email, tenant ID, user object ID, group/app-role membership, and SharePoint access checks.</span>
+        </div>
+        <div class="auto-fill-row">
+          <strong>Still configured by IT</strong>
+          <span>Entra app client ID, redirect URI, allowed tenant, Graph permission model, and admin/user group names.</span>
+        </div>
+        <div class="auto-fill-row">
+          <strong>Detected groups</strong>
+          <span>${state.microsoftAccount.detectedGroups.length ? state.microsoftAccount.detectedGroups.map(escapeHtml).join(", ") : "Not checked yet"}</span>
+        </div>
+      </div>
+    </div>
+    <div class="grid two" style="margin-top:16px">
       <div class="field">
         <label>Microsoft tenant name</label>
         <input class="input" value="${escapeHtml(state.settings.tenant)}" placeholder="company" oninput="state.settings.tenant=this.value" />
