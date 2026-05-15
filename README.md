@@ -14,10 +14,10 @@ Implemented flows:
 
 - Property list with all 21 properties and brand metadata.
 - Trip Report home with 11 workbook sections and progress tracking.
-- Section detail with Yes / No / See Notes / NA statuses.
+- Section detail with Yes / No / N/A statuses.
 - Section-level notes and mock photo attachments.
 - Hyatt-specific Bob label and Innspector App label for other brands.
-- Action Plan rows auto-created from No / See Notes findings.
+- Action Plan rows auto-created from No findings.
 - Manager and RDO signature capture pads.
 - Review and mock SharePoint submit queue.
 - Settings for tenant, site URL pattern, library, and folder template.

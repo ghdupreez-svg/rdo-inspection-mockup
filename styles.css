@@ -565,12 +565,6 @@ button {
   color: var(--red);
 }
 
-.status-button.active.see_notes {
-  background: var(--gold-2);
-  border-color: var(--gold);
-  color: var(--gold);
-}
-
 .status-button.active.na {
   background: var(--blue-2);
   border-color: var(--blue);

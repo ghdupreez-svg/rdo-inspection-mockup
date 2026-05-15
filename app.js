@@ -231,7 +231,7 @@ function normalizeTemplateSection(section, sectionIndex) {
       return {
         id: item.id || `${baseId}-${itemIndex + 1}`,
         text: String(text || `Question ${itemIndex + 1}`).trim(),
-        status: item.status || "",
+        status: item.status === "see_notes" ? "no" : item.status || "",
         notes: item.notes || "",
         photos: Array.isArray(item.photos) ? item.photos : []
       };
@@ -268,7 +268,6 @@ function slugify(value) {
 const statusLabels = {
   yes: "Yes",
   no: "No",
-  see_notes: "See Notes",
   na: "NA"
 };
 
@@ -748,7 +747,7 @@ function setStatus(sectionId, itemId, status) {
   const section = state.sections.find((entry) => entry.id === sectionId);
   const item = section.items.find((entry) => entry.id === itemId);
   item.status = status;
-  if (status === "no" || status === "see_notes") {
+  if (status === "no") {
     const exists = state.actionPlan.some((row) => row.sourceItemId === itemId);
     if (!exists) {
       state.actionPlan.push({
@@ -974,7 +973,7 @@ function renderHome() {
   const uncovered = state.sections.flatMap((section) => section.items.filter((item) => !item.status)).length;
   return screen(
     "Trip Report",
-    "Walk the 11 workbook sections with exact Yes / No / See Notes / NA statuses, section notes, and section-level photos.",
+    "Walk the workbook sections with exact Yes / No / N/A statuses, section notes, and section-level photos.",
     h`
       <div class="grid three">
         <div class="metric"><span class="muted">Overall progress</span><strong>${progress.complete}/${progress.total}</strong><div class="progress-bar"><span style="--value:${progress.pct}%"></span></div></div>
@@ -1028,7 +1027,7 @@ function renderSection() {
                   <button class="status-button ${item.status === status ? `active ${status}` : ""}" onclick="setStatus('${section.id}', '${item.id}', '${status}')">${statusLabels[status]}</button>
                 `).join("")}
               </div>
-              ${["no", "see_notes"].includes(item.status) ? h`
+              ${item.status === "no" ? h`
                 <div class="question-detail">
                   <div class="field">
                     <label>Notes for this question</label>
@@ -1091,11 +1090,11 @@ function renderSection() {
 function renderActionPlan() {
   return screen(
     "Action Plan",
-    "Rows are suggested from every No or See Notes item and remain fully editable before signature.",
+    "Rows are suggested from every No item and remain fully editable before signature.",
     h`
       <div class="toolbar">
         <span class="chip gold">${state.actionPlan.length} rows</span>
-        <span class="muted">Rows come directly from report items marked No or See Notes.</span>
+        <span class="muted">Rows come directly from report items marked No.</span>
       </div>
       <div class="table-wrap">
         <table>
@@ -1129,7 +1128,7 @@ function renderActionPlan() {
                 </td>
                 <td><button class="btn danger" onclick="deleteAction('${row.id}')">Remove</button></td>
               </tr>
-            `).join("") : `<tr><td colspan="7" class="muted">No action rows yet. Mark checklist items No or See Notes, or add one manually.</td></tr>`}
+            `).join("") : `<tr><td colspan="7" class="muted">No action rows yet. Mark checklist items No, or add one manually.</td></tr>`}
           </tbody>
         </table>
       </div>
